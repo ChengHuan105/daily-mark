@@ -143,25 +143,70 @@
       link.rel = 'manifest'; link.href = URL.createObjectURL(blob);
       document.head.appendChild(link);
 
-      // Service Worker (离线缓存)
+      // Service Worker —— 网络优先 + 自动更新
+      const APP_VERSION = 'dm-v3';
+      localStorage.setItem('dm_app_version', APP_VERSION);
+
       if ('serviceWorker' in navigator) {
         const swCode = `
-          const CACHE = 'dm-v1';
+          const CACHE_NAME = '${APP_VERSION}';
+          const PREV_CACHES = ['dm-v1','dm-v2'];
+
+          // 安装时清理旧缓存
           self.addEventListener('install', e => {
-            e.waitUntil(caches.open(CACHE).then(c => c.addAll([self.location.href])));
+            e.waitUntil(
+              caches.open(CACHE_NAME).then(cache =>
+                cache.addAll([self.location.href])
+              )
+            );
             self.skipWaiting();
           });
+
+          // 激活时删除所有旧版本缓存
+          self.addEventListener('activate', e => {
+            e.waitUntil(
+              caches.keys().then(keys =>
+                Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k)))
+              )
+            );
+            self.clients.claim();
+          });
+
+          // 网络优先策略：先请求网络，失败才用缓存
           self.addEventListener('fetch', e => {
             e.respondWith(
-              caches.match(e.request).then(r => r || fetch(e.request).then(res => {
-                if(res.ok){ const clone = res.clone(); caches.open(CACHE).then(c => c.put(e.request, clone)); }
-                return res;
-              }).catch(() => caches.match(e.request)))
+              fetch(e.request)
+                .then(res => {
+                  if (res.ok) {
+                    const clone = res.clone();
+                    caches.open(CACHE_NAME).then(c => c.put(e.request, clone));
+                  }
+                  return res;
+                })
+                .catch(() => caches.match(e.request))
             );
+          });
+
+          // 收到更新消息时跳过等待
+          self.addEventListener('message', e => {
+            if (e.data === 'skipWaiting') self.skipWaiting();
           });
         `;
         const swBlob = new Blob([swCode], {type:'application/javascript'});
-        navigator.serviceWorker.register(URL.createObjectURL(swBlob)).catch(()=>{});
+        navigator.serviceWorker.register(URL.createObjectURL(swBlob))
+          .then(reg => {
+            // 检测是否有新版本在等待
+            reg.addEventListener('updatefound', () => {
+              const newWorker = reg.installing;
+              newWorker.addEventListener('statechange', () => {
+                if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                  // 新版本已就绪，通知 App 刷新
+                  document.dispatchEvent(new CustomEvent('sw-update-ready'));
+                }
+              });
+            });
+          })
+          .catch(()=>{});
       }
     })();
   </script>
@@ -247,7 +292,15 @@
       const [people,setPeople]=useStoredState('dm_people',[]);
 
       const [showQuote,setShowQuote]=useState(false);
+      const [updateReady,setUpdateReady]=useState(false);
       useEffect(()=>{const l=localStorage.getItem('dm_last_open');if(l!==today()){setShowQuote(true);localStorage.setItem('dm_last_open',today());}},[]);
+
+      // 监听 Service Worker 更新事件
+      useEffect(()=>{
+        const handler = () => setUpdateReady(true);
+        document.addEventListener('sw-update-ready', handler);
+        return () => document.removeEventListener('sw-update-ready', handler);
+      }, []);
 
       useEffect(()=>{if(bgMode==='seasonal'){const s=getSeason();if(s!==bgSeason)setBgSeason(s);}},[bgMode,bgSeason]);
 
@@ -271,6 +324,14 @@
       return (
         <div id="app-shell" className={`${bgClass} min-h-screen pb-20 relative`} style={bgStyle}>
           <SeasonDeco season={currentSeason}/>
+          {/* 更新提示条 */}
+          {updateReady && (
+            <div className="fixed top-0 left-0 right-0 z-50 flex items-center justify-center gap-3 px-4 py-3 bg-gray-900/90 backdrop-blur text-white text-sm" style={{maxWidth:430,margin:'0 auto'}}>
+              <span>🔔 新版本已就绪</span>
+              <button onClick={()=>{if(navigator.serviceWorker.controller){navigator.serviceWorker.controller.postMessage('skipWaiting');}window.location.reload();}}
+                className="px-4 py-1 bg-white text-gray-900 rounded-full text-xs font-bold active:scale-95">立即更新</button>
+            </div>
+          )}
           <div className="relative z-10 px-3 pt-4">
             {showQuote && <QuoteModal onClose={()=>setShowQuote(false)}/>}
             {tab==='today' && <TodayPage {...tp}/>}
