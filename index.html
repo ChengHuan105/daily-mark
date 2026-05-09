@@ -1,0 +1,803 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+
+  <!-- PWA Meta -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="每日印记">
+  <meta name="theme-color" content="#87CEEB">
+  <meta name="description" content="记录今天，让每一天都有印记">
+
+  <!-- 图标: 用内联 SVG 生成 -->
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📖</text></svg>">
+
+  <title>每日印记</title>
+
+  <!-- Tailwind -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- React -->
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  <!-- Babel -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <style>
+    /* ============================================
+       全局 —— 纯竖屏手机 App
+    ============================================ */
+    * { -webkit-tap-highlight-color: transparent; box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow-x: hidden; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Helvetica Neue', sans-serif;
+      display: flex; justify-content: center;
+      background: #000;
+    }
+    #root {
+      width: 100%; max-width: 430px;
+      min-height: 100vh; min-height: 100dvh;
+      position: relative; overflow-x: hidden; overflow-y: auto;
+    }
+    ::-webkit-scrollbar { display: none; }
+
+    /* 毛玻璃 */
+    .glass {
+      background: rgba(255,255,255,0.22);
+      backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255,255,255,0.35); border-radius: 20px;
+    }
+    .glass-solid {
+      background: rgba(255,255,255,0.48);
+      backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255,255,255,0.5); border-radius: 20px;
+    }
+
+    @keyframes fadeIn { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:translateY(0); } }
+    .animate-in { animation: fadeIn 0.3s ease-out; }
+    @keyframes pulse-dot { 0%,100%{transform:scale(1)} 50%{transform:scale(1.5)} }
+    .rec-dot { animation: pulse-dot 1s ease-in-out infinite; }
+
+    /* ============================================
+       季节背景 —— 渐变 + 静态点缀
+    ============================================ */
+    .bg-spring { background: linear-gradient(180deg, #87CEEB 0%, #A8D8A8 55%, #8CCD8C 100%); }
+    .bg-summer { background: linear-gradient(180deg, #5BA0D0 0%, #88D0C8 40%, #5DAE5D 100%); }
+    .bg-autumn { background: linear-gradient(180deg, #E8B868 0%, #D49550 45%, #C07850 100%); }
+    .bg-winter { background: linear-gradient(180deg, #B0C4DE 0%, #D0DCE8 50%, #E8EFF5 100%); }
+    .bg-custom { background-size: cover; background-position: center; background-repeat: no-repeat; background-attachment: fixed; }
+
+    /* 春: 绿叶 */
+    .d-spring .d{position:fixed;pointer-events:none;z-index:0;font-size:36px;opacity:.3}
+    .d-spring .d:nth-child(1){top:40px;left:8px;font-size:42px}
+    .d-spring .d:nth-child(2){top:100px;right:6px;font-size:28px;opacity:.25}
+    .d-spring .d:nth-child(3){bottom:160px;left:10px;font-size:32px}
+    .d-spring .d:nth-child(4){bottom:100px;right:12px;font-size:38px;opacity:.25}
+    .d-spring .d:nth-child(5){top:280px;left:5px;font-size:24px;opacity:.2}
+
+    /* 夏: 荷花 */
+    .d-summer .d{position:fixed;pointer-events:none;z-index:0;font-size:40px;opacity:.3}
+    .d-summer .d:nth-child(1){top:50px;left:10px;font-size:46px}
+    .d-summer .d:nth-child(2){top:180px;right:5px;font-size:34px;opacity:.25}
+    .d-summer .d:nth-child(3){bottom:200px;left:8px;font-size:36px}
+    .d-summer .d:nth-child(4){bottom:80px;right:10px;font-size:40px;opacity:.25}
+
+    /* 秋: 枫叶 */
+    .d-autumn .d{position:fixed;pointer-events:none;z-index:0;font-size:38px;opacity:.35}
+    .d-autumn .d:nth-child(1){top:60px;right:8px;font-size:44px}
+    .d-autumn .d:nth-child(2){top:200px;left:5px;font-size:30px;opacity:.28}
+    .d-autumn .d:nth-child(3){bottom:180px;right:6px;font-size:36px}
+    .d-autumn .d:nth-child(4){bottom:90px;left:8px;font-size:40px;opacity:.28}
+    .d-autumn .d:nth-child(5){top:380px;right:4px;font-size:28px;opacity:.22}
+
+    /* 冬: 雪花 */
+    .d-winter .d{position:fixed;pointer-events:none;z-index:0;font-size:28px;opacity:.35}
+    .d-winter .d:nth-child(1){top:40px;left:15px;font-size:32px}
+    .d-winter .d:nth-child(2){top:120px;right:10px;font-size:26px;opacity:.28}
+    .d-winter .d:nth-child(3){top:300px;left:8px;font-size:22px}
+    .d-winter .d:nth-child(4){bottom:200px;right:12px;font-size:30px}
+    .d-winter .d:nth-child(5){bottom:120px;left:10px;font-size:24px;opacity:.28}
+    .d-winter .d:nth-child(6){bottom:60px;right:8px;font-size:28px;opacity:.3}
+    .d-winter .d:nth-child(7){top:220px;right:14px;font-size:20px;opacity:.25}
+
+    /* 进度条 */
+    .progress-bar {
+      height: 4px; border-radius: 2px; background: rgba(255,255,255,0.3);
+      overflow: hidden;
+    }
+    .progress-fill {
+      height: 100%; border-radius: 2px;
+      background: linear-gradient(90deg, #4CAF50, #8BC34A);
+      transition: width 0.5s ease;
+    }
+
+    /* Chip tag */
+    .chip {
+      display: inline-flex; align-items: center; gap: 2px;
+      padding: 2px 10px; border-radius: 999px;
+      font-size: 12px; font-weight: 500;
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <!-- PWA 注册脚本 -->
+  <script>
+    (function(){
+      // Manifest (blob URL)
+      const manifest = {
+        name: "每日印记",
+        short_name: "每日印记",
+        description: "记录今天，让每一天都有印记",
+        start_url: location.href,
+        display: "standalone",
+        orientation: "portrait",
+        background_color: "#87CEEB",
+        theme_color: "#87CEEB",
+        icons: [{ src: "data:image/svg+xml," + encodeURIComponent("<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='#87CEEB'/><text x='50' y='68' text-anchor='middle' font-size='60'>📖</text></svg>"), sizes: "any", type: "image/svg+xml" }]
+      };
+      const blob = new Blob([JSON.stringify(manifest)], {type:'application/json'});
+      const link = document.createElement('link');
+      link.rel = 'manifest'; link.href = URL.createObjectURL(blob);
+      document.head.appendChild(link);
+
+      // Service Worker (离线缓存)
+      if ('serviceWorker' in navigator) {
+        const swCode = `
+          const CACHE = 'dm-v1';
+          self.addEventListener('install', e => {
+            e.waitUntil(caches.open(CACHE).then(c => c.addAll([self.location.href])));
+            self.skipWaiting();
+          });
+          self.addEventListener('fetch', e => {
+            e.respondWith(
+              caches.match(e.request).then(r => r || fetch(e.request).then(res => {
+                if(res.ok){ const clone = res.clone(); caches.open(CACHE).then(c => c.put(e.request, clone)); }
+                return res;
+              }).catch(() => caches.match(e.request)))
+            );
+          });
+        `;
+        const swBlob = new Blob([swCode], {type:'application/javascript'});
+        navigator.serviceWorker.register(URL.createObjectURL(swBlob)).catch(()=>{});
+      }
+    })();
+  </script>
+
+  <script type="text/babel">
+    const { useState, useEffect, useRef, useMemo } = React;
+
+    // ============================================
+    // 工具
+    // ============================================
+    const today = () => new Date().toISOString().slice(0,10);
+    const now = () => new Date().toISOString();
+    const uid = () => Date.now().toString(36)+Math.random().toString(36).slice(2,7);
+
+    function useStoredState(key, def) {
+      const [s,ss] = useState(()=>{try{const v=localStorage.getItem(key);return v?JSON.parse(v):def}catch{return def}});
+      useEffect(()=>{localStorage.setItem(key,JSON.stringify(s))},[key,s]);
+      return [s,ss];
+    }
+
+    // 格言
+    const QUOTES = [
+      {text:"每一天都是一个新的开始，用微笑迎接它吧。",author:"佚名"},{text:"你今天的努力，是幸运的伏笔。",author:"佚名"},
+      {text:"生活不止眼前的苟且，还有诗和远方。",author:"高晓松"},{text:"不积跬步，无以至千里。",author:"荀子"},
+      {text:"世界以痛吻我，要我报之以歌。",author:"泰戈尔"},{text:"种一棵树最好的时间是十年前，其次是现在。",author:"非洲谚语"},
+      {text:"你若爱，生活哪里都可爱。",author:"丰子恺"},{text:"一个人知道自己为什么而活，就可以忍受任何一种生活。",author:"尼采"},
+      {text:"Stay hungry, stay foolish.",author:"Steve Jobs"},{text:"人生如逆旅，我亦是行人。",author:"苏轼"},
+      {text:"真正的英雄主义，是认清生活真相后依然热爱生活。",author:"罗曼·罗兰"},{text:"凡是过往，皆为序章。",author:"莎士比亚"},
+      {text:"且将新火试新茶，诗酒趁年华。",author:"苏轼"},{text:"万物皆有裂痕，那是光照进来的地方。",author:"科恩"},
+      {text:"此心安处是吾乡。",author:"苏轼"},{text:"每一个不曾起舞的日子，都是对生命的辜负。",author:"尼采"},
+      {text:"不乱于心，不困于情，不畏将来，不念过往。",author:"丰子恺"},{text:"你所浪费的今天，是昨天死去的人奢望的明天。",author:"哈佛校训"},
+      {text:"凡不能毁灭我的，必使我更强大。",author:"尼采"},{text:"但行好事，莫问前程。",author:"增广贤文"},
+      {text:"生活是种律动，须有光有影，有晴有雨。",author:"老舍"},{text:"人是为活着本身而活着。",author:"余华"},
+      {text:"既然选择了远方，便只顾风雨兼程。",author:"汪国真"},{text:"不要因为走得太远，忘了为什么出发。",author:"纪伯伦"},
+      {text:"人生如茶，不会苦一辈子，但总会苦一阵子。",author:"佚名"},{text:"你若盛开，蝴蝶自来。",author:"佚名"},
+      {text:"世上只有一种成功，就是用自己喜欢的方式过一生。",author:"佚名"},{text:"对未来真正的慷慨，是把一切献给现在。",author:"加缪"},
+      {text:"无论你从什么时候开始，重要的是开始后不要停止。",author:"佚名"},{text:"心之所向，素履以往。",author:"木心"},
+    ];
+
+    function getSeason(d=new Date()) {
+      const m=d.getMonth()+1;
+      if(m>=3&&m<=5)return'spring';if(m>=6&&m<=8)return'summer';
+      if(m>=9&&m<=11)return'autumn';return'winter';
+    }
+
+    // 运动
+    const SPORTS=[
+      {key:'running',icon:'🏃',label:'跑步'},{key:'fitness',icon:'🏋️',label:'健身'},
+      {key:'yoga',icon:'🧘',label:'瑜伽'},{key:'swimming',icon:'🏊',label:'游泳'},
+      {key:'cycling',icon:'🚴',label:'骑行'},{key:'ball',icon:'⚽',label:'球类'},
+      {key:'walking',icon:'🚶',label:'散步'},{key:'other',icon:'🎯',label:'其他'},
+    ];
+
+    // 天气心情
+    const WEATHER_MOODS = [
+      {key:'sunny',icon:'☀️',label:'晴天'},{key:'cloudy',icon:'⛅',label:'多云'},
+      {key:'rainy',icon:'🌧️',label:'雨天'},{key:'rainbow',icon:'🌈',label:'彩虹'},
+      {key:'storm',icon:'⚡',label:'雷暴'},{key:'calm',icon:'🌙',label:'平静'},
+      {key:'full',icon:'💪',label:'充实'},{key:'irritated',icon:'🌪️',label:'烦躁'},
+    ];
+
+    // 头像
+    const AVATAR_COLORS=['#FF6B6B','#4ECDC4','#45B7D1','#96CEB4','#FFEAA7','#DDA0DD','#F7DC6F','#BB8FCE','#85C1E9','#F8C471','#82E0AA','#F1948A'];
+    function avatarColor(n){let h=0;for(let i=0;i<(n||'?').length;i++)h=((h<<5)-h)+n.charCodeAt(i);return AVATAR_COLORS[Math.abs(h)%AVATAR_COLORS.length];}
+    function initial(n){return(n||'?').charAt(0).toUpperCase();}
+
+    // ============================================
+    // App
+    // ============================================
+    function App() {
+      const [tab,setTab]=useState('today');
+      const [bgMode,setBgMode]=useStoredState('dm_bg_mode','seasonal');
+      const [bgSeason,setBgSeason]=useStoredState('dm_bg_season',getSeason());
+      const [bgCustom,setBgCustom]=useStoredState('dm_bg_custom',null);
+
+      const [tasks,setTasks]=useStoredState('dm_tasks',[]);
+      const [checkins,setCheckins]=useStoredState('dm_checkins',{});
+      const [recordings,setRecordings]=useStoredState('dm_recordings',[]);
+      const [photos,setPhotos]=useStoredState('dm_photos',[]);
+      const [stories,setStories]=useStoredState('dm_stories',[]);
+      const [grows,setGrows]=useStoredState('dm_grows',[]);
+      const [sports,setSports]=useStoredState('dm_sports',[]);
+      const [people,setPeople]=useStoredState('dm_people',[]);
+
+      const [showQuote,setShowQuote]=useState(false);
+      useEffect(()=>{const l=localStorage.getItem('dm_last_open');if(l!==today()){setShowQuote(true);localStorage.setItem('dm_last_open',today());}},[]);
+
+      useEffect(()=>{if(bgMode==='seasonal'){const s=getSeason();if(s!==bgSeason)setBgSeason(s);}},[bgMode,bgSeason]);
+
+      const currentSeason = bgMode==='seasonal'?getSeason():['spring','summer','autumn','winter'].includes(bgMode)?bgMode:'spring';
+      const bgClass = bgMode==='custom'&&bgCustom?'bg-custom':`bg-${currentSeason}`;
+      const bgStyle = bgMode==='custom'&&bgCustom?{backgroundImage:`url(${bgCustom})`}:{};
+
+      const exportData=()=>{
+        const d={tasks,checkins,recordings,photos,stories,grows,sports,people,bgMode,bgSeason,bgCustom,exportedAt:now()};
+        const b=new Blob([JSON.stringify(d,null,2)],{type:'application/json'});
+        const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=`daily-mark-${today()}.json`;a.click();
+      };
+
+      const importData=()=>{
+        const inp=document.createElement('input');inp.type='file';inp.accept='.json';
+        inp.onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=ev=>{try{const d=JSON.parse(ev.target.result);if(!confirm('导入将覆盖当前数据，确定继续？'))return;setTasks(d.tasks||[]);setCheckins(d.checkins||{});setRecordings(d.recordings||[]);setPhotos(d.photos||[]);setStories(d.stories||[]);setGrows(d.grows||[]);setSports(d.sports||[]);setPeople(d.people||[]);if(d.bgMode)setBgMode(d.bgMode);if(d.bgSeason)setBgSeason(d.bgSeason);if(d.bgCustom)setBgCustom(d.bgCustom);alert('导入成功！');}catch{alert('文件格式错误');}};r.readAsText(f);};inp.click();
+      };
+
+      const tp = {tasks,setTasks,checkins,setCheckins,recordings,setRecordings,photos,setPhotos,stories,setStories,grows,setGrows,sports,setSports,people,setPeople};
+
+      return (
+        <div id="app-shell" className={`${bgClass} min-h-screen pb-20 relative`} style={bgStyle}>
+          <SeasonDeco season={currentSeason}/>
+          <div className="relative z-10 px-3 pt-4">
+            {showQuote && <QuoteModal onClose={()=>setShowQuote(false)}/>}
+            {tab==='today' && <TodayPage {...tp}/>}
+            {tab==='timeline' && <TimelinePage {...tp}/>}
+            {tab==='checkin' && <CheckinPage checkins={checkins} setCheckins={setCheckins}/>}
+            {tab==='library' && <LibraryPage {...tp}/>}
+            {tab==='me' && <MePage bgMode={bgMode} setBgMode={setBgMode} bgSeason={bgSeason} setBgSeason={setBgSeason} bgCustom={bgCustom} setBgCustom={setBgCustom} onExport={exportData} onImport={importData}/>}
+          </div>
+          <BottomNav tab={tab} setTab={setTab}/>
+        </div>
+      );
+    }
+
+    function SeasonDeco({season}) {
+      const map={spring:['🍃','🌿','🍃','🌱','🍃'],summer:['🪷','🪷','🪷','🪷'],autumn:['🍁','🍂','🍁','🍂','🍁'],winter:['❄️','❄️','❄️','❄️','❄️','❄️','❄️']};
+      const items=map[season];if(!items)return null;
+      return (<div className={`d-${season}`}>{items.map((e,i)=><span key={i} className="d">{e}</span>)}</div>);
+    }
+
+    function BottomNav({tab,setTab}) {
+      const tabs=[{key:'today',icon:'☀️',label:'今日'},{key:'timeline',icon:'📋',label:'时间轴'},{key:'checkin',icon:'✅',label:'打卡'},{key:'library',icon:'📚',label:'记录库'},{key:'me',icon:'👤',label:'我的'}];
+      return (
+        <nav className="fixed bottom-0 left-0 right-0 z-50 flex justify-around items-center bg-white/35 backdrop-blur-xl border-t border-white/25 py-1.5" style={{maxWidth:430,margin:'0 auto'}}>
+          {tabs.map(t=>(<button key={t.key} onClick={()=>setTab(t.key)} className={`flex flex-col items-center px-4 py-1 rounded-xl transition ${tab===t.key?'bg-white/50 scale-105 shadow-sm':'hover:bg-white/20'}`}><span className="text-xl">{t.icon}</span><span className={`text-xs mt-0.5 ${tab===t.key?'font-bold text-gray-800':'text-gray-600'}`}>{t.label}</span></button>))}
+        </nav>
+      );
+    }
+
+    // ============================================
+    // 格言
+    // ============================================
+    function QuoteModal({onClose}) {
+      const [idx,setIdx]=useState(()=>Math.floor(Math.random()*QUOTES.length));
+      const [anim,setAnim]=useState(true);
+      const q=QUOTES[idx];
+      const refresh=()=>{setAnim(false);setTimeout(()=>{setAnim(true);setIdx(Math.floor(Math.random()*QUOTES.length));},100);};
+      return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/25 backdrop-blur-sm" style={{maxWidth:430,margin:'0 auto'}} onClick={onClose}>
+          <div className="glass-solid m-6 p-8 text-center animate-in max-w-sm w-full" onClick={e=>e.stopPropagation()}>
+            <h2 className="text-lg font-bold text-gray-700 mb-4">☀️ 清晨格言</h2>
+            <div className={`transition-opacity duration-200 ${anim?'opacity-100':'opacity-0'}`}><p className="text-xl text-gray-800 leading-relaxed mb-3">"{q.text}"</p><p className="text-sm text-gray-500">—— {q.author}</p></div>
+            <div className="flex gap-3 mt-6 justify-center"><button onClick={refresh} className="px-4 py-2 bg-white/60 rounded-full text-sm hover:bg-white/80">🔄 换一条</button><button onClick={onClose} className="px-6 py-2 bg-gray-800 text-white rounded-full text-sm hover:bg-gray-700">开始新的一天 →</button></div>
+          </div>
+        </div>
+      );
+    }
+
+    // ============================================
+    // 今日页面
+    // ============================================
+    function TodayPage(props) {
+      return (
+        <div className="space-y-4 pb-4">
+          <TodayHeader {...props}/>
+          <TaskSection tasks={props.tasks} setTasks={props.setTasks}/>
+          <RecordSection recordings={props.recordings} setRecordings={props.setRecordings}/>
+          <PhotoSection photos={props.photos} setPhotos={props.setPhotos}/>
+          <StorySection stories={props.stories} setStories={props.setStories} people={props.people} setPeople={props.setPeople}/>
+          <GrowSection grows={props.grows} setGrows={props.setGrows}/>
+          <SportSection sports={props.sports} setSports={props.setSports}/>
+        </div>
+      );
+    }
+
+    /* 今日头部 + 进度条 */
+    function TodayHeader({tasks,recordings,photos,stories,grows,sports}) {
+      const d=new Date();const wn=['日','一','二','三','四','五','六'];
+      const td = today();
+
+      // 检查各模块是否已有今日记录
+      const modules = [
+        !!tasks.find(t=>t.date===td),
+        !!recordings.find(r=>r.date===td),
+        !!photos.find(p=>p.date===td),
+        !!stories.find(s=>s.date===td),
+        !!grows.find(g=>g.date===td),
+        !!sports.find(sp=>sp.date===td),
+      ];
+      const done = modules.filter(Boolean).length;
+      const total = modules.length;
+      const pct = Math.round(done/total*100);
+
+      return (
+        <div className="glass p-4">
+          <p className="text-sm text-gray-500 text-center">{d.getFullYear()}年{d.getMonth()+1}月{d.getDate()}日 星期{wn[d.getDay()]}</p>
+          <div className="flex items-center gap-3 mt-2">
+            <div className="flex-1 progress-bar"><div className="progress-fill" style={{width:`${pct}%`}}/></div>
+            <span className="text-xs text-gray-500 flex-shrink-0">{done}/{total} 模块</span>
+          </div>
+          {pct===100 ? <p className="text-xs text-green-600 text-center mt-1">🎉 今天的记录已完成！</p>
+            : <p className="text-xs text-gray-400 text-center mt-1">记录今天，让每一天都有印记 ✨</p>}
+        </div>
+      );
+    }
+
+    // ============================================
+    // 每日任务
+    // ============================================
+    function TaskSection({tasks,setTasks}) {
+      const [text,setText]=useState('');const td=today();
+      const todayTasks=tasks.filter(t=>t.date===td);
+      const active=todayTasks.filter(t=>!t.done);
+      const done=todayTasks.filter(t=>t.done);
+      const add=()=>{if(!text.trim())return;setTasks([...tasks,{id:uid(),text:text.trim(),done:false,date:td,createdAt:now()}]);setText('');};
+      const toggle=id=>setTasks(tasks.map(t=>t.id===id?{...t,done:!t.done,completedAt:!t.done?now():null}:t));
+      const del=id=>{if(confirm('删除？'))setTasks(tasks.filter(t=>t.id!==id));};
+      const edit=(id,v)=>setTasks(tasks.map(t=>t.id===id?{...t,text:v}:t));
+
+      return (
+        <div className="glass p-4">
+          <h3 className="font-bold text-gray-700 mb-3 flex items-center gap-2"><span>📝</span>每日任务<span className="text-xs text-gray-400 font-normal ml-auto">{active.length} 待完成</span></h3>
+          <div className="flex gap-2 mb-3"><input value={text} onChange={e=>setText(e.target.value)} onKeyDown={e=>e.key==='Enter'&&add()} placeholder="添加新任务..." className="flex-1 px-3 py-2 bg-white/40 rounded-xl text-sm outline-none border border-white/40 focus:border-white/70 placeholder-gray-400"/><button onClick={add} className="px-4 py-2 bg-gray-800 text-white rounded-xl text-sm font-medium active:scale-95">+</button></div>
+          {active.map(t=><TaskItem key={t.id} task={t} onToggle={toggle} onDelete={del} onEdit={edit}/>)}
+          {done.length>0&&(<details className="mt-3" open><summary className="text-xs text-gray-400 cursor-pointer mb-2">已完成 ({done.length})</summary>{done.map(t=><TaskItem key={t.id} task={t} onToggle={toggle} onDelete={del} onEdit={edit}/>)}</details>)}
+          {todayTasks.length===0&&<p className="text-center text-gray-400 text-sm py-4">今天还没有任务 ✍️</p>}
+        </div>
+      );
+    }
+
+    function TaskItem({task,onToggle,onDelete,onEdit}) {
+      const [editing,setEditing]=useState(false);const [txt,setTxt]=useState(task.text);
+      const save=()=>{if(txt.trim()){onEdit(task.id,txt.trim());setEditing(false);}};
+      return (
+        <div className={`flex items-center gap-2 py-2 px-2 rounded-xl ${task.done?'opacity-50':'hover:bg-white/20'}`}>
+          <button onClick={()=>onToggle(task.id)} className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${task.done?'bg-green-400 border-green-400':'border-gray-400 hover:border-green-400'}`}>{task.done&&<span className="text-white text-xs">✓</span>}</button>
+          {editing?<input value={txt} onChange={e=>setTxt(e.target.value)} onBlur={save} onKeyDown={e=>e.key==='Enter'&&save()} className="flex-1 px-2 py-1 bg-white/50 rounded-lg text-sm outline-none" autoFocus/>:<span className={`flex-1 text-sm ${task.done?'line-through text-gray-400':'text-gray-700'}`} onDoubleClick={()=>{if(!task.done){setEditing(true);setTxt(task.text);}}}>{task.text}</span>}
+          <button onClick={()=>onDelete(task.id)} className="text-gray-400 hover:text-red-400 text-xs px-1">✕</button>
+        </div>
+      );
+    }
+
+    // ============================================
+    // 录音随记
+    // ============================================
+    function RecordSection({recordings,setRecordings}) {
+      const [recording,setRecording]=useState(false);const [transcribing,setTranscribing]=useState(false);
+      const [audioURL,setAudioURL]=useState(null);const [transcript,setTranscript]=useState('');
+      const mr=useRef(null);const chunks=useRef([]);
+
+      const start=async()=>{try{const s=await navigator.mediaDevices.getUserMedia({audio:true});mr.current=new MediaRecorder(s);chunks.current=[];mr.current.ondataavailable=e=>chunks.current.push(e.data);mr.current.onstop=()=>{setAudioURL(URL.createObjectURL(new Blob(chunks.current,{type:'audio/webm'})));s.getTracks().forEach(t=>t.stop());};mr.current.start();setRecording(true);setAudioURL(null);setTranscript('');}catch(e){alert('无法访问麦克风: '+e.message);}};
+      const stop=()=>{if(mr.current?.state==='recording'){mr.current.stop();setRecording(false);}};
+      const startSR=()=>{if(!('webkitSpeechRecognition'in window)&&!('SpeechRecognition'in window)){alert('语音识别需要Chrome');return;}const SR=window.SpeechRecognition||window.webkitSpeechRecognition;const r=new SR();r.lang='zh-CN';r.continuous=false;r.interimResults=false;r.onresult=e=>setTranscript(e.results[0][0].transcript);r.onerror=e=>{alert('识别出错: '+e.error);setTranscribing(false);};r.onend=()=>setTranscribing(false);r.start();setTranscribing(true);};
+      const save=(inc)=>{if(!audioURL)return;const b=new Blob(chunks.current,{type:'audio/webm'});const rd=new FileReader();rd.onload=()=>{setRecordings([{id:uid(),date:today(),audio:rd.result,transcript:inc?transcript:'',createdAt:now()},...recordings]);setAudioURL(null);setTranscript('');};rd.readAsDataURL(b);};
+
+      return (
+        <div className="glass p-4">
+          <h3 className="font-bold text-gray-700 mb-3 flex items-center gap-2"><span>🎙️</span>录音随记</h3>
+          <div className="flex items-center gap-3 mb-3"><button onClick={recording?stop:start} className={`w-14 h-14 rounded-full flex items-center justify-center text-2xl transition ${recording?'bg-red-500 rec-dot scale-110':'bg-gray-800 hover:bg-gray-700'}`}>{recording?'⏹':'🎤'}</button><div><p className="text-sm font-medium text-gray-700">{recording?'录音中...':audioURL?'录音完成':'点击开始录音'}</p>{recording&&<p className="text-xs text-red-400 rec-dot mt-0.5">● REC</p>}</div></div>
+          {audioURL&&(<div className="space-y-2"><button onClick={startSR} disabled={transcribing} className="text-sm px-3 py-1.5 bg-blue-500/20 text-blue-700 rounded-full hover:bg-blue-500/30 disabled:opacity-50">{transcribing?'识别中...':'🎙️→📝 语音转文字'}</button>{transcript&&<p className="text-sm bg-white/30 rounded-lg p-2 text-gray-700">{transcript}</p>}</div>)}
+          {audioURL&&(<div className="mt-3 space-y-2"><audio src={audioURL} controls className="w-full h-8"/><div className="flex gap-2"><button onClick={()=>save(false)} className="flex-1 py-2 bg-white/50 rounded-xl text-sm hover:bg-white/70">💾 仅语音</button><button onClick={()=>save(true)} className="flex-1 py-2 bg-gray-800 text-white rounded-xl text-sm hover:bg-gray-700">💾 语音+文字</button></div></div>)}
+          {recordings.length>0&&(<details className="mt-3"><summary className="text-xs text-gray-400 cursor-pointer">最近 ({recordings.length})</summary>{recordings.slice(0,5).map(r=>(<div key={r.id} className="mt-2 p-2 bg-white/20 rounded-lg"><p className="text-xs text-gray-400">{r.date}</p>{r.audio&&<audio src={r.audio} controls className="w-full h-7 mt-1"/>}{r.transcript&&<p className="text-xs text-gray-600 mt-1">📝 {r.transcript}</p>}</div>))}</details>)}
+        </div>
+      );
+    }
+
+    // ============================================
+    // 随手拍
+    // ============================================
+    function PhotoSection({photos,setPhotos}) {
+      const [caption,setCaption]=useState('');const [preview,setPreview]=useState(null);const fi=useRef(null);
+      const handle=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=ev=>setPreview(ev.target.result);r.readAsDataURL(f);};
+      const save=()=>{if(!preview)return;setPhotos([{id:uid(),date:today(),src:preview,caption:caption.trim(),createdAt:now()},...photos]);setPreview(null);setCaption('');};
+      const del=id=>{if(confirm('删除？'))setPhotos(photos.filter(p=>p.id!==id));};
+
+      return (
+        <div className="glass p-4">
+          <h3 className="font-bold text-gray-700 mb-3 flex items-center gap-2"><span>📸</span>随手拍</h3>
+          <button onClick={()=>fi.current.click()} className="w-full py-2 bg-white/50 rounded-xl text-sm hover:bg-white/70 mb-3">📷 拍照/选图</button>
+          <input ref={fi} type="file" accept="image/*" capture="environment" onChange={handle} className="hidden"/>
+          {preview&&(<div className="space-y-2 mb-3 animate-in"><img src={preview} className="w-full h-48 object-cover rounded-xl" alt=""/><input value={caption} onChange={e=>setCaption(e.target.value)} placeholder="添加文字说明..." className="w-full px-3 py-2 bg-white/40 rounded-xl text-sm outline-none placeholder-gray-400"/><button onClick={save} className="w-full py-2 bg-gray-800 text-white rounded-xl text-sm hover:bg-gray-700">保存图片</button></div>)}
+          {photos.length>0&&(<div className="columns-2 gap-2 mt-2">{photos.map(p=>(<div key={p.id} className="break-inside-avoid mb-2 glass overflow-hidden"><img src={p.src} className="w-full object-cover rounded-t-xl" alt="" loading="lazy"/><div className="p-2 flex justify-between items-start"><div>{p.caption&&<p className="text-xs text-gray-700">{p.caption}</p>}<p className="text-xs text-gray-400">{p.date}</p></div><button onClick={()=>del(p.id)} className="text-gray-400 hover:text-red-400 text-xs">✕</button></div></div>))}</div>)}
+        </div>
+      );
+    }
+
+    // ============================================
+    // 社交趣事 —— 单人/团体模式
+    // ============================================
+    function StorySection({stories,setStories,people,setPeople}) {
+      const [showForm,setShowForm]=useState(false);
+      const [mode,setMode]=useState('single'); // single | group
+      const [text,setText]=useState('');const [tags,setTags]=useState('');
+      const [preview,setPreview]=useState(null);
+      const [selected,setSelected]=useState([]);
+      const [singlePerson,setSinglePerson]=useState('');
+      const [newPerson,setNewPerson]=useState('');
+      const fi=useRef(null);
+
+      const handleImg=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=ev=>setPreview(ev.target.result);r.readAsDataURL(f);};
+
+      const addPerson=()=>{const n=newPerson.trim();if(!n||people.find(p=>p.name===n))return;setPeople([...people,{id:uid(),name:n,color:avatarColor(n)}]);setNewPerson('');};
+
+      const togglePerson=id=>{setSelected(p=>p.includes(id)?p.filter(x=>x!==id):[...p,id]);};
+
+      const save=()=>{
+        if(!text.trim()&&!preview)return;
+        const tagList=tags.split(/[,\s#]+/).filter(Boolean).map(t=>t.startsWith('#')?t:`#${t}`);
+        const participants = mode==='single'?[singlePerson].filter(Boolean):selected;
+        setStories([{id:uid(),date:today(),text:text.trim(),tags:tagList,mode,participants,photo:preview,createdAt:now()},...stories]);
+        setText('');setTags('');setPreview(null);setSelected([]);setSinglePerson('');setShowForm(false);
+      };
+
+      const del=id=>{if(confirm('删除？'))setStories(stories.filter(s=>s.id!==id));};
+      const personInfo=id=>people.find(p=>p.id===id);
+      const personByName=name=>people.find(p=>p.name===name);
+
+      return (
+        <div className="glass p-4">
+          <h3 className="font-bold text-gray-700 mb-3 flex items-center gap-2"><span>💬</span>社交趣事
+            <button onClick={()=>setShowForm(!showForm)} className="ml-auto text-xs px-2 py-1 bg-white/50 rounded-full hover:bg-white/70">{showForm?'收起':'+ 记录'}</button>
+          </h3>
+
+          {showForm&&(
+            <div className="space-y-3 mb-3 animate-in">
+              {/* 单人/团体切换 */}
+              <div className="flex bg-white/30 rounded-xl p-1 gap-1">
+                <button onClick={()=>setMode('single')} className={`flex-1 py-1.5 rounded-lg text-xs font-medium transition ${mode==='single'?'bg-white/70 text-gray-800 shadow-sm':'text-gray-500'}`}>🧑 单人</button>
+                <button onClick={()=>setMode('group')} className={`flex-1 py-1.5 rounded-lg text-xs font-medium transition ${mode==='group'?'bg-white/70 text-gray-800 shadow-sm':'text-gray-500'}`}>👥 团体</button>
+              </div>
+
+              {/* 单人模式: 输入名字 */}
+              {mode==='single'&&(
+                <div>
+                  <p className="text-xs text-gray-500 mb-1.5">和谁？</p>
+                  <div className="flex gap-1.5 flex-wrap">
+                    {people.map(p=>(<button key={p.id} onClick={()=>setSinglePerson(singlePerson===p.name?'':p.name)}
+                      className={`flex flex-col items-center gap-0.5 p-1.5 rounded-xl transition ${singlePerson===p.name?'bg-gray-800 scale-110':'bg-white/40 hover:bg-white/60'}`}>
+                      <div className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold text-white shadow-sm" style={{backgroundColor:p.color}}>{initial(p.name)}</div>
+                      <span className={`text-xs ${singlePerson===p.name?'text-white':'text-gray-600'}`}>{p.name}</span></button>))}
+                    <div className="flex items-end gap-1 p-1.5">
+                      <div className="flex flex-col items-center gap-1">
+                        <input value={newPerson} onChange={e=>setNewPerson(e.target.value)} placeholder="名字" onKeyDown={e=>e.key==='Enter'&&addPerson()} className="w-14 h-9 text-center bg-white/40 rounded-xl text-xs outline-none placeholder-gray-400"/>
+                        <button onClick={addPerson} className="text-xs text-blue-600 hover:underline">添加</button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* 团体模式: 多选 */}
+              {mode==='group'&&(
+                <div>
+                  <p className="text-xs text-gray-500 mb-1.5">和哪些人在一起？</p>
+                  <div className="flex gap-1.5 flex-wrap">
+                    {people.map(p=>(<button key={p.id} onClick={()=>togglePerson(p.id)}
+                      className={`flex flex-col items-center gap-0.5 p-1.5 rounded-xl transition ${selected.includes(p.id)?'bg-gray-800 scale-110':'bg-white/40 hover:bg-white/60'}`}>
+                      <div className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold text-white shadow-sm" style={{backgroundColor:p.color}}>{initial(p.name)}</div>
+                      <span className={`text-xs ${selected.includes(p.id)?'text-white':'text-gray-600'}`}>{p.name}</span></button>))}
+                    <div className="flex items-end gap-1 p-1.5">
+                      <div className="flex flex-col items-center gap-1">
+                        <input value={newPerson} onChange={e=>setNewPerson(e.target.value)} placeholder="名字" onKeyDown={e=>e.key==='Enter'&&addPerson()} className="w-14 h-9 text-center bg-white/40 rounded-xl text-xs outline-none placeholder-gray-400"/>
+                        <button onClick={addPerson} className="text-xs text-blue-600 hover:underline">添加</button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <button onClick={()=>fi.current.click()} className="w-full py-2 bg-white/50 rounded-xl text-sm hover:bg-white/70">📸 添加照片</button>
+              <input ref={fi} type="file" accept="image/*" capture="environment" onChange={handleImg} className="hidden"/>
+              {preview&&(<div className="relative"><img src={preview} className="w-full h-40 object-cover rounded-xl" alt=""/><button onClick={()=>setPreview(null)} className="absolute top-2 right-2 w-6 h-6 bg-black/50 text-white rounded-full text-xs">✕</button></div>)}
+
+              <textarea value={text} onChange={e=>setText(e.target.value)} placeholder="记录这次经历..." rows="2" className="w-full px-3 py-2 bg-white/40 rounded-xl text-sm outline-none resize-none placeholder-gray-400"/>
+              <input value={tags} onChange={e=>setTags(e.target.value)} placeholder="标签 (如: 聚会, 旅行)" className="w-full px-3 py-2 bg-white/40 rounded-xl text-sm outline-none placeholder-gray-400"/>
+              <button onClick={save} className="w-full py-2 bg-gray-800 text-white rounded-xl text-sm font-medium active:scale-[0.98]">保存</button>
+            </div>
+          )}
+
+          {/* 已保存的卡片 */}
+          {stories.map(s=>{
+            const participants = s.mode==='single'
+              ? [personByName(s.participants[0])].filter(Boolean)
+              : s.participants.map(pid=>personInfo(pid)).filter(Boolean);
+            return (
+              <div key={s.id} className="p-3 bg-white/20 rounded-xl mb-2">
+                {participants.length>0&&(
+                  <div className="flex -space-x-2 mb-2">
+                    {participants.map(p=>p&&(<div key={p.id} className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white ring-2 ring-white/60" style={{backgroundColor:p.color}} title={p.name}>{initial(p.name)}</div>))}
+                  </div>
+                )}
+                {s.photo&&<img src={s.photo} className="w-full h-36 object-cover rounded-lg mb-2" alt="" loading="lazy"/>}
+                {s.text&&<p className="text-sm text-gray-700">{s.text}</p>}
+                <div className="flex items-center gap-1 mt-1.5 flex-wrap">{s.tags.map(t=><span key={t} className="text-xs px-2 py-0.5 bg-white/50 rounded-full text-gray-500">{t}</span>)}<span className="text-xs text-gray-400 ml-auto">{s.date}</span></div>
+                <button onClick={()=>del(s.id)} className="text-xs text-gray-400 hover:text-red-400 mt-1">删除</button>
+              </div>
+            );
+          })}
+          {stories.length===0&&!showForm&&<p className="text-center text-gray-400 text-sm py-2">还没有社交趣事 💬</p>}
+        </div>
+      );
+    }
+
+    // ============================================
+    // 今日成长 —— 知识(多条) / 技能(多条) / 天气心情 / 反思
+    // ============================================
+    function GrowSection({grows,setGrows}) {
+      const td=today();const th=grows.find(g=>g.date===td);
+      const [knowledge,setKnowledge]=useState(th?.knowledge||[]);
+      const [skill,setSkill]=useState(th?.skill||[]);
+      const [mood,setMood]=useState(th?.mood||'');
+      const [reflect,setReflect]=useState(th?.reflect||'');
+      const [kInput,setKInput]=useState('');const [sInput,setSInput]=useState('');
+
+      const addK=()=>{if(!kInput.trim())return;setKnowledge([...knowledge,kInput.trim()]);setKInput('');};
+      const removeK=i=>setKnowledge(knowledge.filter((_,j)=>j!==i));
+      const addS=()=>{if(!sInput.trim())return;setSkill([...skill,sInput.trim()]);setSInput('');};
+      const removeS=i=>setSkill(skill.filter((_,j)=>j!==i));
+
+      const save=()=>{
+        if(!knowledge.length&&!skill.length&&!mood&&!reflect.trim())return;
+        setGrows([{id:th?.id||uid(),date:td,knowledge,skill,mood,reflect:reflect.trim(),createdAt:now()},...grows.filter(g=>g.date!==td)]);
+      };
+
+      return (
+        <div className="glass p-4">
+          <h3 className="font-bold text-gray-700 mb-3 flex items-center gap-2"><span>🌱</span>今日成长</h3>
+
+          {/* 知识 —— 多条录入 */}
+          <div className="mb-3">
+            <label className="text-xs text-gray-500 font-medium mb-1 block">📚 知识 — 今天学到了什么？</label>
+            <div className="flex gap-1 flex-wrap mb-1.5">
+              {knowledge.map((k,i)=>(<span key={i} className="chip bg-blue-100/70 text-blue-800">{k}<button onClick={()=>removeK(i)} className="ml-1 text-blue-400 hover:text-blue-600">×</button></span>))}
+            </div>
+            <div className="flex gap-1.5"><input value={kInput} onChange={e=>setKInput(e.target.value)} onKeyDown={e=>e.key==='Enter'&&addK()} placeholder="新知识点" className="flex-1 px-3 py-2 bg-white/40 rounded-xl text-sm outline-none placeholder-gray-400"/><button onClick={addK} className="px-3 py-2 bg-white/50 rounded-xl text-sm hover:bg-white/70">+</button></div>
+          </div>
+
+          {/* 技能 —— 多条录入 */}
+          <div className="mb-3">
+            <label className="text-xs text-gray-500 font-medium mb-1 block">🔧 技能 — 练习或提升了什么？</label>
+            <div className="flex gap-1 flex-wrap mb-1.5">
+              {skill.map((s,i)=>(<span key={i} className="chip bg-green-100/70 text-green-800">{s}<button onClick={()=>removeS(i)} className="ml-1 text-green-400 hover:text-green-600">×</button></span>))}
+            </div>
+            <div className="flex gap-1.5"><input value={sInput} onChange={e=>setSInput(e.target.value)} onKeyDown={e=>e.key==='Enter'&&addS()} placeholder="技能练习" className="flex-1 px-3 py-2 bg-white/40 rounded-xl text-sm outline-none placeholder-gray-400"/><button onClick={addS} className="px-3 py-2 bg-white/50 rounded-xl text-sm hover:bg-white/70">+</button></div>
+          </div>
+
+          {/* 天气心情 */}
+          <div className="mb-3">
+            <label className="text-xs text-gray-500 font-medium mb-1 block">🌤️ 心情 — 今天是什么天气？</label>
+            <div className="flex gap-1 flex-wrap">
+              {WEATHER_MOODS.map(w=>(<button key={w.key} onClick={()=>setMood(mood===w.key?'':w.key)}
+                className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium transition ${mood===w.key?'bg-gray-800 text-white':'bg-white/40 hover:bg-white/60 text-gray-600'}`}>{w.icon} {w.label}</button>))}
+            </div>
+          </div>
+
+          {/* 今日反思 */}
+          <div className="mb-3">
+            <label className="text-xs text-gray-500 font-medium mb-1 block">💡 今日反思 — 有什么感悟或可以改进的？</label>
+            <textarea value={reflect} onChange={e=>setReflect(e.target.value)} placeholder="今天有什么思考？哪里可以做得更好？" rows="2" className="w-full px-3 py-2 bg-white/40 rounded-xl text-sm outline-none resize-none placeholder-gray-400"/>
+          </div>
+
+          <button onClick={save} className="w-full py-2.5 bg-gray-800 text-white rounded-xl text-sm font-medium active:scale-[0.98]">💾 保存成长</button>
+        </div>
+      );
+    }
+
+    // ============================================
+    // 运动打卡
+    // ============================================
+    function SportSection({sports,setSports}) {
+      const [type,setType]=useState('');const [dur,setDur]=useState('');const [note,setNote]=useState('');const [show,setShow]=useState(false);
+      const td=today();const ts=sports.filter(s=>s.date===td);
+      const save=()=>{if(!type||!dur)return;setSports([{id:uid(),type,duration:parseInt(dur),note:note.trim(),date:td,createdAt:now()},...sports]);setType('');setDur('');setNote('');setShow(false);};
+      const del=id=>{if(confirm('删除？'))setSports(sports.filter(s=>s.id!==id));};
+      const sl=k=>SPORTS.find(s=>s.key===k);
+
+      return (
+        <div className="glass p-4">
+          <h3 className="font-bold text-gray-700 mb-3 flex items-center gap-2"><span>🏅</span>运动打卡<button onClick={()=>setShow(!show)} className="ml-auto text-xs px-2 py-1 bg-white/50 rounded-full hover:bg-white/70">{show?'收起':'+ 记录'}</button></h3>
+          {show&&(<div className="space-y-3 mb-3 animate-in">
+            <div className="grid grid-cols-4 gap-2">{SPORTS.map(s=>(<button key={s.key} onClick={()=>setType(s.key)} className={`flex flex-col items-center p-2 rounded-xl text-xs transition ${type===s.key?'bg-gray-800 text-white':'bg-white/40 hover:bg-white/60 text-gray-700'}`}><span className="text-xl mb-0.5">{s.icon}</span>{s.label}</button>))}</div>
+            <input value={dur} onChange={e=>setDur(e.target.value)} type="number" placeholder="时长(分钟)" min="1" className="w-full px-3 py-2 bg-white/40 rounded-xl text-sm outline-none placeholder-gray-400"/>
+            <input value={note} onChange={e=>setNote(e.target.value)} placeholder="备注（距离/组数...）" className="w-full px-3 py-2 bg-white/40 rounded-xl text-sm outline-none placeholder-gray-400"/>
+            <button onClick={save} className="w-full py-2 bg-gray-800 text-white rounded-xl text-sm font-medium active:scale-[0.98]">保存运动</button>
+          </div>)}
+          {ts.length>0&&(<div className="space-y-2">{ts.map(s=>{const sp=sl(s.type);return(<div key={s.id} className="flex items-center gap-2 p-2 bg-white/20 rounded-xl"><span className="text-2xl">{sp?.icon||'🎯'}</span><div className="flex-1"><p className="text-sm font-medium text-gray-700">{sp?.label||s.type} · {s.duration}分钟</p>{s.note&&<p className="text-xs text-gray-500">{s.note}</p>}</div><button onClick={()=>del(s.id)} className="text-gray-400 hover:text-red-400 text-xs">✕</button></div>);})}</div>)}
+          {ts.length===0&&!show&&<p className="text-center text-gray-400 text-sm py-2">今天运动了吗？💪</p>}
+        </div>
+      );
+    }
+
+    // ============================================
+    // 时间轴
+    // ============================================
+    function TimelinePage({tasks,recordings,photos,stories,grows,sports,people}) {
+      const all=useMemo(()=>{
+        const ev=[];
+        tasks.filter(t=>t.done&&t.completedAt).forEach(t=>ev.push({type:'task',date:t.date,time:t.completedAt,data:t,id:t.id}));
+        recordings.forEach(r=>ev.push({type:'recording',date:r.date,time:r.createdAt,data:r,id:r.id}));
+        photos.forEach(p=>ev.push({type:'photo',date:p.date,time:p.createdAt,data:p,id:p.id}));
+        stories.forEach(s=>ev.push({type:'story',date:s.date,time:s.createdAt,data:s,id:s.id}));
+        grows.forEach(g=>ev.push({type:'grow',date:g.date,time:g.createdAt,data:g,id:g.id}));
+        sports.forEach(s=>ev.push({type:'sport',date:s.date,time:s.createdAt,data:s,id:s.id}));
+        return ev.sort((a,b)=>b.time.localeCompare(a.time));
+      },[tasks,recordings,photos,stories,grows,sports]);
+      const grouped=useMemo(()=>{const g={};all.forEach(e=>{if(!g[e.date])g[e.date]=[];g[e.date].push(e);});return Object.entries(g);},[all]);
+      if(all.length===0)return<div className="glass p-8 text-center text-gray-400">还没有记录，从今天开始吧 🌟</div>;
+      const sl=k=>SPORTS.find(s=>s.key===k);
+      const pi=id=>people.find(p=>p.id===id);
+      const pn=name=>people.find(p=>p.name===name);
+      const wm=k=>WEATHER_MOODS.find(w=>w.key===k);
+
+      return (
+        <div className="space-y-4 pb-4">
+          <h2 className="text-xl font-bold text-white/80 px-1">📋 时间轴</h2>
+          {grouped.map(([date,events])=>(
+            <div key={date} className="glass p-4 animate-in">
+              <h3 className="text-sm font-bold text-gray-500 mb-3 flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-gray-400"/> {date} · {events.length} 条记录</h3>
+              <div className="space-y-3">
+                {events.map(e=>(
+                  <div key={e.id} className="pl-3 border-l-2 border-white/40">
+                    {e.type==='task'&&<div className="flex items-start gap-2"><span>✅</span><div><p className="text-sm text-gray-700 line-through">{e.data.text}</p><p className="text-xs text-gray-400">完成任务</p></div></div>}
+                    {e.type==='sport'&&(()=>{const sp=sl(e.data.type);return<div className="flex items-start gap-2"><span className="text-xl">{sp?.icon||'🎯'}</span><div><p className="text-sm font-medium text-gray-700">{sp?.label||e.data.type} · {e.data.duration}分钟</p>{e.data.note&&<p className="text-xs text-gray-500">{e.data.note}</p>}<p className="text-xs text-gray-400">运动打卡</p></div></div>;})()}
+                    {e.type==='recording'&&<div><p className="text-sm text-gray-700 flex items-center gap-1"><span>🎙️</span>录音</p>{e.data.transcript&&<p className="text-xs text-gray-500 mt-1">📝{e.data.transcript}</p>}{e.data.audio&&<audio src={e.data.audio} controls className="w-full h-7 mt-1"/>}<p className="text-xs text-gray-400 mt-0.5">{e.data.date}</p></div>}
+                    {e.type==='photo'&&<div><p className="text-sm text-gray-700 flex items-center gap-1"><span>📸</span>随手拍</p>{e.data.caption&&<p className="text-xs text-gray-600 mt-1">{e.data.caption}</p>}<img src={e.data.src} className="mt-1 rounded-lg max-h-40 object-cover" alt="" loading="lazy"/><p className="text-xs text-gray-400 mt-0.5">{e.data.date}</p></div>}
+                    {e.type==='story'&&<div><p className="text-sm text-gray-700 flex items-center gap-1"><span>💬</span>社交趣事</p>{(()=>{const pp=e.data.mode==='single'?[pn(e.data.participants[0])].filter(Boolean):(e.data.participants||[]).map(pid=>pi(pid)).filter(Boolean);return pp.length>0?<div className="flex -space-x-1.5 mt-1">{pp.map(p=>p&&<div key={p.id} className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white ring-1 ring-white/50" style={{backgroundColor:p.color}} title={p.name}>{initial(p.name)}</div>)}</div>:null;})()}{e.data.photo&&<img src={e.data.photo} className="mt-1 rounded-lg max-h-36 object-cover" alt="" loading="lazy"/>}{e.data.text&&<p className="text-sm text-gray-700 mt-1">{e.data.text}</p>}<div className="flex gap-1 flex-wrap mt-1">{e.data.tags?.map(t=><span key={t} className="text-xs px-1.5 bg-white/30 rounded-full text-gray-500">{t}</span>)}</div><p className="text-xs text-gray-400 mt-0.5">{e.data.date}</p></div>}
+                    {e.type==='grow'&&<div><p className="text-sm text-gray-700 flex items-center gap-1"><span>🌱</span>今日成长</p>{e.data.knowledge?.length>0&&<p className="text-xs text-gray-600 mt-1">📚 {e.data.knowledge.join(' / ')}</p>}{e.data.skill?.length>0&&<p className="text-xs text-gray-600 mt-0.5">🔧 {e.data.skill.join(' / ')}</p>}{e.data.mood&&(()=>{const w=wm(e.data.mood);return<p className="text-xs text-gray-600 mt-0.5">🌤️ {w?.icon} {w?.label}</p>;})()}{e.data.reflect&&<p className="text-xs text-gray-600 mt-0.5">💡 {e.data.reflect}</p>}<p className="text-xs text-gray-400 mt-0.5">{e.data.date}</p></div>}
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      );
+    }
+
+    // ============================================
+    // 打卡
+    // ============================================
+    function CheckinPage({checkins,setCheckins}) {
+      const [vd,setVd]=useState(new Date());const y=vd.getFullYear(),m=vd.getMonth();
+      const dim=new Date(y,m+1,0).getDate();const fd=new Date(y,m,1).getDay();
+      const key=d=>`${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+      const toggle=d=>setCheckins({...checkins,[key(d)]:!checkins[key(d)]});
+      const checked=d=>!!checkins[key(d)];
+      const total=Object.values(checkins).filter(Boolean).length;
+      const mTotal=Array.from({length:dim},(_,i)=>i+1).filter(d=>checked(d)).length;
+
+      return (
+        <div className="space-y-4 pb-4">
+          <div className="glass p-4 text-center"><h2 className="text-xl font-bold text-gray-800">✅ 打卡记录</h2><p className="text-sm text-gray-500 mt-1">累计 {total} 天 · 本月 {mTotal} 天</p></div>
+          <div className="glass p-4">
+            <div className="flex items-center justify-between mb-4"><button onClick={()=>setVd(new Date(y,m-1,1))} className="text-xl px-3 py-1 hover:bg-white/30 rounded-full">◀</button><span className="font-bold text-gray-700 text-lg">{y}年{m+1}月</span><button onClick={()=>setVd(new Date(y,m+1,1))} className="text-xl px-3 py-1 hover:bg-white/30 rounded-full">▶</button></div>
+            <div className="grid grid-cols-7 gap-1 mb-2">{['日','一','二','三','四','五','六'].map(d=><div key={d} className="text-center text-xs text-gray-400 py-1">{d}</div>)}</div>
+            <div className="grid grid-cols-7 gap-1">
+              {Array.from({length:fd},(_,i)=><div key={`e${i}`} className="aspect-square"/>)}
+              {Array.from({length:dim},(_,i)=>i+1).map(d=>{const c=checked(d);const isT=today()===key(d);return(<button key={d} onClick={()=>toggle(d)} className={`aspect-square rounded-xl flex items-center justify-center text-sm font-medium transition active:scale-90 ${c?'bg-green-400 text-white shadow-md':isT?'bg-white/50 ring-2 ring-blue-400 text-gray-700':'hover:bg-white/30 text-gray-600'}`}>{d}</button>);})}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // ============================================
+    // 记录库
+    // ============================================
+    function LibraryPage({recordings,photos,stories,grows,sports,people}) {
+      const [filter,setFilter]=useState('all');
+      const sl=k=>SPORTS.find(s=>s.key===k);
+      const pi=id=>people.find(p=>p.id===id);
+      const wm=k=>WEATHER_MOODS.find(w=>w.key===k);
+
+      const items=[];
+      if(filter==='all'||filter==='recording')recordings.forEach(r=>items.push({...r,_t:'recording'}));
+      if(filter==='all'||filter==='photo')photos.forEach(p=>items.push({...p,_t:'photo'}));
+      if(filter==='all'||filter==='story')stories.forEach(s=>items.push({...s,_t:'story'}));
+      if(filter==='all'||filter==='grow')grows.forEach(g=>items.push({...g,_t:'grow'}));
+      if(filter==='all'||filter==='sport')sports.forEach(s=>items.push({...s,_t:'sport'}));
+      items.sort((a,b)=>(b.createdAt||b.date).localeCompare(a.createdAt||a.date));
+
+      const tabs=[{k:'all',l:'全部',i:'📋'},{k:'sport',l:'运动',i:'🏅'},{k:'recording',l:'录音',i:'🎙️'},{k:'photo',l:'图片',i:'📸'},{k:'story',l:'趣事',i:'💬'},{k:'grow',l:'成长',i:'🌱'}];
+
+      return (
+        <div className="space-y-4 pb-4">
+          <h2 className="text-xl font-bold text-white/80 px-1">📚 记录库</h2>
+          <div className="flex gap-1.5 overflow-x-auto pb-1">{tabs.map(t=>(<button key={t.k} onClick={()=>setFilter(t.k)} className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition ${filter===t.k?'bg-white/60 text-gray-800 shadow-sm':'bg-white/20 text-gray-600 hover:bg-white/40'}`}>{t.i} {t.l}</button>))}</div>
+          {items.length===0&&<div className="glass p-8 text-center text-gray-400">暂无记录</div>}
+
+          {items.filter(i=>i._t==='photo').length>0&&(<div className="columns-2 gap-2">{items.filter(i=>i._t==='photo').map(p=>(<div key={p.id} className="break-inside-avoid mb-2 glass overflow-hidden"><img src={p.src} className="w-full object-cover rounded-t-xl" alt="" loading="lazy"/><div className="p-2">{p.caption&&<p className="text-xs text-gray-700">{p.caption}</p>}<p className="text-xs text-gray-400">{p.date}</p></div></div>))}</div>)}
+
+          {items.filter(i=>i._t!=='photo').map(item=>(
+            <div key={item.id} className="glass p-3">
+              {item._t==='sport'&&(()=>{const sp=sl(item.type);return<div><p className="text-xs text-gray-400">{item.date} · 🏅 运动</p><p className="text-sm font-medium text-gray-700 mt-1">{sp?.icon}{sp?.label||item.type} · {item.duration}分钟</p>{item.note&&<p className="text-xs text-gray-500">{item.note}</p>}</div>;})()}
+              {item._t==='recording'&&<div><p className="text-xs text-gray-400">{item.date} · 🎙️ 录音</p>{item.audio&&<audio src={item.audio} controls className="w-full h-7 mt-1"/>}{item.transcript&&<p className="text-xs text-gray-600 mt-1">📝 {item.transcript}</p>}</div>}
+              {item._t==='story'&&<div><p className="text-xs text-gray-400">{item.date} · 💬 社交趣事</p>{item.participants?.length>0&&<div className="flex -space-x-1.5 mt-1">{item.participants.map(pid=>{const p=pi(pid);return p?<div key={pid} className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white ring-1 ring-white/50" style={{backgroundColor:p.color}} title={p.name}>{initial(p.name)}</div>:null;})}</div>}{item.photo&&<img src={item.photo} className="mt-1 rounded-lg max-h-32 object-cover" alt="" loading="lazy"/>}{item.text&&<p className="text-sm text-gray-700 mt-1">{item.text}</p>}<div className="flex gap-1 flex-wrap mt-1">{item.tags?.map(t=><span key={t} className="text-xs px-1.5 bg-white/30 rounded-full text-gray-500">{t}</span>)}</div></div>}
+              {item._t==='grow'&&<div><p className="text-xs text-gray-400">{item.date} · 🌱 成长</p>{item.knowledge?.length>0&&<p className="text-xs text-gray-600 mt-1">📚 {item.knowledge.join(' / ')}</p>}{item.skill?.length>0&&<p className="text-xs text-gray-600">🔧 {item.skill.join(' / ')}</p>}{item.mood&&(()=>{const w=wm(item.mood);return<p className="text-xs text-gray-600">🌤️ {w?.icon} {w?.label}</p>;})()}{item.reflect&&<p className="text-xs text-gray-600">💡 {item.reflect}</p>}</div>}
+            </div>
+          ))}
+        </div>
+      );
+    }
+
+    // ============================================
+    // 我的
+    // ============================================
+    function MePage({bgMode,setBgMode,bgSeason,setBgSeason,bgCustom,setBgCustom,onExport,onImport}) {
+      const fi=useRef(null);const [showBg,setShow]=useState(false);
+      const handle=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=ev=>{setBgCustom(ev.target.result);setBgMode('custom');};r.readAsDataURL(f);};
+      const themes=[{k:'spring',l:'🌸 春 — 绿叶'},{k:'summer',l:'🪷 夏 — 荷花'},{k:'autumn',l:'🍁 秋 — 枫叶'},{k:'winter',l:'❄️ 冬 — 雪花'}];
+
+      return (
+        <div className="space-y-4 pb-4">
+          <h2 className="text-xl font-bold text-white/80 px-1">👤 我的</h2>
+
+          <div className="glass p-4">
+            <h3 className="font-bold text-gray-700 mb-3">🎨 背景设置</h3>
+            <div className="space-y-2">
+              <button onClick={()=>{setBgMode('seasonal');setShow(false);}} className={`w-full text-left p-3 rounded-xl transition flex items-center gap-2 ${bgMode==='seasonal'?'bg-white/60 ring-2 ring-blue-400':'bg-white/30 hover:bg-white/40'}`}><span>🌍</span><div><p className="text-sm font-medium text-gray-700">跟随季节</p><p className="text-xs text-gray-400">自动切换四季</p></div>{bgMode==='seasonal'&&<span className="ml-auto text-blue-500">✓</span>}</button>
+              <button onClick={()=>setShow(!showBg)} className={`w-full text-left p-3 rounded-xl transition flex items-center gap-2 ${['spring','summer','autumn','winter'].includes(bgMode)?'bg-white/60 ring-2 ring-blue-400':'bg-white/30 hover:bg-white/40'}`}><span>🎭</span><div><p className="text-sm font-medium text-gray-700">手动选择</p><p className="text-xs text-gray-400">固定一个季节主题</p></div>{['spring','summer','autumn','winter'].includes(bgMode)&&<span className="ml-auto text-blue-500">✓</span>}</button>
+              {showBg&&<div className="grid grid-cols-2 gap-2 mt-2 animate-in">{themes.map(t=>(<button key={t.k} onClick={()=>{setBgMode(t.k);setBgSeason(t.k);}} className={`p-3 rounded-xl text-left transition ${bgMode===t.k?'bg-white/60 ring-2 ring-blue-400':'bg-white/30 hover:bg-white/50'}`}><p className="text-sm font-medium text-gray-700">{t.l}</p></button>))}</div>}
+              <button onClick={()=>fi.current.click()} className={`w-full text-left p-3 rounded-xl transition flex items-center gap-2 ${bgMode==='custom'?'bg-white/60 ring-2 ring-blue-400':'bg-white/30 hover:bg-white/40'}`}><span>🖼️</span><div><p className="text-sm font-medium text-gray-700">自定义背景</p><p className="text-xs text-gray-400">上传本地图片</p></div>{bgMode==='custom'&&<span className="ml-auto text-blue-500">✓</span>}</button>
+              <input ref={fi} type="file" accept="image/*" onChange={handle} className="hidden"/>
+              {bgMode==='custom'&&bgCustom&&<div className="mt-2"><img src={bgCustom} className="w-full h-24 object-cover rounded-xl" alt=""/><button onClick={()=>{setBgCustom(null);setBgMode('seasonal');}} className="text-xs text-red-400 mt-1 hover:underline">移除自定义</button></div>}
+            </div>
+          </div>
+
+          <div className="glass p-4">
+            <h3 className="font-bold text-gray-700 mb-3">💾 数据管理</h3>
+            <div className="space-y-2"><button onClick={onExport} className="w-full py-2.5 bg-white/50 rounded-xl text-sm font-medium hover:bg-white/70 flex items-center justify-center gap-2">📤 导出数据 (JSON)</button><button onClick={onImport} className="w-full py-2.5 bg-white/50 rounded-xl text-sm font-medium hover:bg-white/70 flex items-center justify-center gap-2">📥 导入数据 (JSON)</button></div>
+            <p className="text-xs text-gray-400 mt-2 text-center">数据存储在浏览器本地，不上传任何服务器</p>
+          </div>
+
+          <div className="glass p-4 text-center"><p className="text-lg font-bold text-gray-700">每日印记</p><p className="text-xs text-gray-400 mt-1">v2.0 · 可安装到手机桌面</p></div>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>
